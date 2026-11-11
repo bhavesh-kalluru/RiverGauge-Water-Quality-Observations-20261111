@@ -1,0 +1,10 @@
+{
+  "project": "RiverGauge",
+  "title": "Water Quality Observations",
+  "sector": "Environment",
+  "subject": "river site",
+  "metric": "Turbidity",
+  "unit": "NTU",
+  "threshold": 5,
+  "sample": "River North"
+}

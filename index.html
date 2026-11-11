@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RiverGauge</title>
+<style>
+body{font:16px system-ui;background:#0b1423;color:#e2e8f0;margin:0}main{max-width:1024px;margin:auto;padding:28px}
+h1{margin-bottom:0}p,small{color:#94a3b8}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:24px 0}.box{background:#19263b;border:1px solid #334155;border-radius:14px;padding:18px}
+.cols{display:grid;grid-template-columns:1fr 1.5fr;gap:16px}.num{font-size:30px;font-weight:750}label{display:block;margin-top:12px}
+input,textarea,select{background:#0b1423;color:white;border:1px solid #475569;border-radius:7px;padding:10px;width:100%;box-sizing:border-box;margin:5px 0 12px;font:inherit}
+button{background:#7dd3fc;border:0;padding:10px 15px;border-radius:8px;font-weight:bold;cursor:pointer}
+.item{border-bottom:1px solid #475569;padding:14px 0}.bad{color:#fca5a5}.good{color:#86efac}
+@media(max-width:740px){.grid{grid-template-columns:1fr 1fr}.cols{grid-template-columns:1fr}}
+</style></head><body><main>
+<h1>RiverGauge</h1><p>Environment · Water Quality Observations</p>
+<div class="grid"><div class="box">Records<div id="total" class="num">0</div></div><div class="box">Alerts<div id="alerts" class="num">0</div></div><div class="box">Open<div id="open" class="num">0</div></div><div class="box">Average<div id="average" class="num">0</div></div></div>
+<div class="cols"><section class="box"><h2>New Turbidity reading</h2><p>Threshold: 5 NTU</p>
+<form id="create"><label for="location">river site</label><input id="location" required minlength="2" maxlength="120" placeholder="River North">
+<label for="value">Turbidity (NTU)</label><input id="value" type="number" required step="any" min="0" max="1000000">
+<label for="note">Notes</label><textarea id="note" maxlength="1500"></textarea><p id="error" role="alert"></p><button>Add reading</button></form></section>
+<section class="box"><h2>Operational records</h2><label for="filter">Status</label><select id="filter"><option value="">All</option><option>new</option><option>investigating</option><option>resolved</option></select><div id="records"></div></section></div>
+<p>Portfolio prototype. Thresholds are illustrative; independently verify any real-world measurements.</p></main>
+<script>
+const $=id=>document.getElementById(id),t=(tag,value)=>{const n=document.createElement(tag);n.textContent=value;return n};let rows=[];
+async function req(url,opt){const r=await fetch(url,opt),j=await r.json();if(!r.ok)throw Error(typeof j.detail==='string'?j.detail:'Request failed');return j}
+async function refresh(){try{const [data,m]=await Promise.all([req('/api/records'),req('/api/metrics')]);rows=data;['total','alerts','open','average'].forEach(k=>$(k).textContent=m[k]);draw()}catch(e){$('records').textContent=e.message}}
+function draw(){const target=$('records');target.replaceChildren();for(const x of rows.filter(x=>!$('filter').value||x.status===$('filter').value)){
+ const box=t('article','');box.className='item';box.append(t('strong',x.location+' · '+x.value+' NTU'),t('p',x.note),t('small',x.status+' · '+new Date(x.created_at).toLocaleString()));
+ const flag=t('p',x.alert?'Above example threshold':'Within example threshold');flag.className=x.alert?'bad':'good';box.append(flag);
+ if(x.status!=='resolved'){const form=t('form',''),status=document.createElement('select'),comment=document.createElement('input');status.add(new Option('investigating','investigating'));status.add(new Option('resolved','resolved'));comment.required=true;comment.minLength=3;comment.placeholder='Review comment';comment.setAttribute('aria-label','Review comment for '+x.location);const btn=t('button','Save review'),error=t('p','');error.setAttribute('role','alert');form.append(status,comment,btn,error);form.onsubmit=async e=>{e.preventDefault();btn.disabled=true;try{await req('/api/records/'+encodeURIComponent(x.id)+'/review',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status.value,comment:comment.value})});await refresh()}catch(ex){error.textContent=ex.message}finally{btn.disabled=false}};box.append(form)}
+ target.append(box)}if(!target.children.length)target.append(t('p','No readings'))}
+$('filter').onchange=draw;$('create').onsubmit=async e=>{e.preventDefault();const b=e.target.querySelector('button');b.disabled=true;try{await req('/api/records',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:$('location').value,value:Number($('value').value),note:$('note').value})});e.target.reset();await refresh()}catch(ex){$('error').textContent=ex.message}finally{b.disabled=false}};refresh();setInterval(refresh,30000);
+</script></body></html>
